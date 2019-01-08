@@ -1,9 +1,42 @@
 import tensorflow as tf
+import mobilenet_v2
+import config
 
 slim = tf.contrib.slim
 
+def basenet(inputs, fatness = 64, dilation = True, is_training = False):
+    #return __basenet_vgg16(inputs, fatness, dilation)
+    return __basenet_mobilenet_v2(inputs, fatness, dilation, is_training)
 
-def basenet(inputs, fatness = 64, dilation = True):
+def __basenet_mobilenet_v2(inputs, fatness = 64, dilation = True, is_training = False):
+    
+    conv_def = getattr(mobilenet_v2, "V2_DEF_" + config.model_name) #v5
+    with tf.contrib.slim.arg_scope(mobilenet_v2.training_scope()):
+        logits, end_points = mobilenet_v2.mobilenet_base(inputs, num_classes=0, 
+            conv_defs = conv_def, is_training = is_training)
+
+        if conv_def == mobilenet_v2.V2_DEF_v4 :
+            layers = [4,8,12,16,17]
+            
+        elif conv_def == mobilenet_v2.V2_DEF_v5 :
+            layers = [6,10,14,17,19]
+            
+        elif conv_def == mobilenet_v2.V2_DEF_v5s :
+            layers = [4,6,8,9,10]
+            
+        elif conv_def == mobilenet_v2.V2_DEF_pixel :
+            layers = [6,10,14,16]
+
+        pool_no = 2
+        end_point_map = {}
+        for layer_no in layers :
+            # or expansion_output
+            end_point_map['pool{}'.format(pool_no)] = end_points["layer_{}".format(layer_no)]
+            pool_no += 1
+         
+    return logits, end_point_map    
+
+def __basenet_vgg16(inputs, fatness = 64, dilation = True):
     """
     backbone net of vgg16
     """
@@ -54,5 +87,5 @@ def basenet(inputs, fatness = 64, dilation = True):
         net = slim.conv2d(net, fatness * 16, [1, 1], scope='fc7')
         end_points['fc7'] = net
 
-    return net, end_points;    
+    return net, end_points    
 

@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.contrib.slim.python.slim.data import parallel_reader
 import tensorflow as tf
 import util
-from nets import pixel_link_symbol
+from nets import model_variants
 import pixel_link
 slim = tf.contrib.slim
 
@@ -50,20 +50,23 @@ min_height = 10
 dropout_ratio = 0
 max_neg_pos_ratio = 3
 
-feat_fuse_type = pixel_link_symbol.FUSE_TYPE_cascade_conv1x1_upsample_sum
-# feat_fuse_type = pixel_link_symbol.FUSE_TYPE_cascade_conv1x1_128_upsamle_sum_conv1x1_2
-# feat_fuse_type = pixel_link_symbol.FUSE_TYPE_cascade_conv1x1_128_upsamle_concat_conv1x1_2
+model_name = "" 
+
+#feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_upsample_sum
+#feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_upsamle_sum_conv1x1_2
+
+# Not working
+#feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_upsamle_concat_conv1x1_2
+
+#feat_fuse_type  = model_variants.FUSE_TYPE_cascade_conv1x1_deconv_sum
+feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_deconv_sum_conv1x1_2
+#feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_deconv_sum_conv1x1_2
 
 pixel_neighbour_type = pixel_link.PIXEL_NEIGHBOUR_TYPE_8
 #pixel_neighbour_type = pixel_link.PIXEL_NEIGHBOUR_TYPE_4
 
-
-#model_type = pixel_link_symbol.MODEL_TYPE_vgg16
-#feat_layers = ['conv2_2', 'conv3_3', 'conv4_3', 'conv5_3', 'fc7']
-#strides = [2]
-model_type = pixel_link_symbol.MODEL_TYPE_vgg16
-feat_layers = ['conv3_3', 'conv4_3', 'conv5_3', 'fc7']
-strides = [4]
+strides = [2]
+#strides = [4]
 
 pixel_cls_weight_method = pixel_link.PIXEL_CLS_WEIGHT_bbox_balanced
 bbox_border_width = 1
@@ -71,6 +74,10 @@ pixel_cls_border_weight_lambda = 1.0
 pixel_cls_loss_weight_lambda = 2.0
 pixel_link_neg_loss_weight_lambda = 1.0
 pixel_link_loss_weight = 1.0
+
+pixel_cls_loss_weight_lambda2 = 1.25
+pixel_link_neg_loss_weight_lambda2 = 0.75
+pixel_link_loss_weight2 = 0.75
 #====================Training and model params END ==================
 #=====================================================================
 
@@ -136,15 +143,20 @@ def  _set_train_with_ignored(train_with_ignored_):
     global train_with_ignored    
     train_with_ignored = train_with_ignored_
 
-    
+def _set_model_name(name) :
+    global model_name
+    model_name = name
+      
 def init_config(image_shape, batch_size = 1, 
                 weight_decay = 0.0005, 
                 num_gpus = 1, 
                 pixel_conf_threshold = 0.6,
-                link_conf_threshold = 0.9):
+                link_conf_threshold = 0.9,
+                model_name = None):
     _set_seg_th(pixel_conf_threshold, link_conf_threshold)
     _set_weight_decay(weight_decay)
     _set_image_shape(image_shape)
+    _set_model_name(model_name)
 
     #init batch size
     global gpus

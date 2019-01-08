@@ -8,7 +8,7 @@ from datasets import dataset_factory
 
 from nets import pixel_link_symbol
 import util
-import pixel_link
+import pixel_link_train
 
 slim = tf.contrib.slim
 import config
@@ -35,6 +35,8 @@ tf.app.flags.DEFINE_string('checkpoint_exclude_scopes', None, 'checkpoint_exclud
 # Optimizer configs.
 # =========================================================================== #
 tf.app.flags.DEFINE_float('learning_rate', 0.001, 'learning rate.')
+tf.app.flags.DEFINE_float('learning_rate_start', 0.005, 'learning rate.')
+tf.app.flags.DEFINE_float('learning_rate_decay', 0.98, 'learning rate.')
 tf.app.flags.DEFINE_float('momentum', 0.9, 'The momentum for the MomentumOptimizer')
 tf.app.flags.DEFINE_float('weight_decay', 0.0001, 'The weight decay on the model weights.')
 tf.app.flags.DEFINE_bool('using_moving_average', True, 'Whether to use ExponentionalMovingAverage')
@@ -47,7 +49,7 @@ tf.app.flags.DEFINE_integer(
     'num_readers', 1,
     'The number of parallel readers that read data from the dataset.')
 tf.app.flags.DEFINE_integer(
-    'num_preprocessing_threads', 24,
+    'num_preprocessing_threads', 4,
     'The number of threads used to create the batches.')
 
 # =========================================================================== #
@@ -61,6 +63,8 @@ tf.app.flags.DEFINE_string(
     'dataset_dir', None, 'The directory where the dataset files are stored.')
 tf.app.flags.DEFINE_integer('train_image_width', 512, 'Train image size')
 tf.app.flags.DEFINE_integer('train_image_height', 512, 'Train image size')
+
+tf.app.flags.DEFINE_string('model_name', None, 'Name of Mobilenet model.')
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -82,7 +86,8 @@ def config_initialization():
     config.init_config(image_shape, 
                        batch_size = FLAGS.batch_size, 
                        weight_decay = FLAGS.weight_decay, 
-                       num_gpus = FLAGS.num_gpus
+                       num_gpus = FLAGS.num_gpus,
+                       model_name = FLAGS.model_name
                    )
 
     batch_size = config.batch_size
@@ -139,7 +144,7 @@ def create_dataset_batch_queue(dataset):
         # calculate ground truth
         pixel_cls_label, pixel_cls_weight, \
         pixel_link_label, pixel_link_weight = \
-            pixel_link.tf_cal_gt_for_single_image(gxs, gys, glabel)
+            pixel_link_train.tf_cal_gt_for_single_image(gxs, gys, glabel)
         
         # batch them
         with tf.name_scope(FLAGS.dataset_name + '_batch'):
@@ -185,20 +190,29 @@ def sum_gradients(clone_grads):
 def create_clones(batch_queue):        
     with tf.device('/cpu:0'):
         global_step = slim.create_global_step()
+
+        decay_steps = 200
+
         learning_rate = tf.constant(FLAGS.learning_rate, name='learning_rate')
+        #learning_rate = tf.train.exponential_decay(FLAGS.learning_rate_start,
+        #                            global_step,
+        #                            decay_steps,
+        #                            FLAGS.learning_rate_decay,
+        #                            staircase=True)
         optimizer = tf.train.MomentumOptimizer(learning_rate, 
                                momentum=FLAGS.momentum, name='Momentum')
+        # optimizer = tf.train.RMSPropOptimizer(learning_rate)
 
         tf.summary.scalar('learning_rate', learning_rate)
     # place clones
-    pixel_link_loss = 0; # for summary only
+    pixel_link_loss = 0 # for summary only
     gradients = []
     for clone_idx, gpu in enumerate(config.gpus):
         do_summary = clone_idx == 0 # only summary on the first clone
         reuse = clone_idx > 0
         with tf.variable_scope(tf.get_variable_scope(), reuse = reuse):
             with tf.name_scope(config.clone_scopes[clone_idx]) as clone_scope:
-                with tf.device(gpu) as clone_device:
+                with tf.device(gpu) as _ :
                     b_image, b_pixel_cls_label, b_pixel_cls_weight, \
                         b_pixel_link_label, b_pixel_link_weight = batch_queue.dequeue()
                     # build model and loss
@@ -212,7 +226,8 @@ def create_clones(batch_queue):
                     
                     # gather losses
                     losses = tf.get_collection(tf.GraphKeys.LOSSES, clone_scope)
-                    assert len(losses) ==  2
+                    assert len(losses) ==  2 or len(losses) == 4
+                    
                     total_clone_loss = tf.add_n(losses) / config.num_clones
                     pixel_link_loss += total_clone_loss
 
@@ -251,8 +266,6 @@ def create_clones(batch_queue):
          
     train_op = control_flow_ops.with_dependencies(train_ops, pixel_link_loss, name='train_op')
     return train_op
-
-    
     
 def train(train_op):
     summary_op = tf.summary.merge_all()
@@ -260,11 +273,11 @@ def train(train_op):
     if FLAGS.gpu_memory_fraction < 0:
         sess_config.gpu_options.allow_growth = True
     elif FLAGS.gpu_memory_fraction > 0:
-        sess_config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_memory_fraction;
+        sess_config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_memory_fraction
     
     init_fn = util.tf.get_init_fn(checkpoint_path = FLAGS.checkpoint_path, train_dir = FLAGS.train_dir, 
                           ignore_missing_vars = FLAGS.ignore_missing_vars, checkpoint_exclude_scopes = FLAGS.checkpoint_exclude_scopes)
-    saver = tf.train.Saver(max_to_keep = 500, write_version = 2)
+    saver = tf.train.Saver(max_to_keep = 200, write_version = 2)
     slim.learning.train(
             train_op,
             logdir = FLAGS.train_dir,
@@ -278,10 +291,10 @@ def train(train_op):
             session_config = sess_config
     )
 
-
 def main(_):
     # The choice of return dataset object via initialization method maybe confusing, 
     # but I need to print all configurations in this method, including dataset information. 
+    sess = tf.InteractiveSession()
     dataset = config_initialization()   
     
     batch_queue = create_dataset_batch_queue(dataset)
