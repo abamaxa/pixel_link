@@ -52,15 +52,23 @@ max_neg_pos_ratio = 3
 
 model_name = "" 
 
+# Can be converted to CoreML, least accurate but smallest
 #feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_upsample_sum
+
+# Can be converted to CoreML
 #feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_upsamle_sum_conv1x1_2
 
 # Not working
 #feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_upsamle_concat_conv1x1_2
 
+# Can be converted to CoreML
 #feat_fuse_type  = model_variants.FUSE_TYPE_cascade_conv1x1_deconv_sum
+
+# Most accurate, can be converted to CoreML
 feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_128_deconv_sum_conv1x1_2
-#feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_deconv_sum_conv1x1_2
+
+# Can be converted to CoreML
+# feat_fuse_type = model_variants.FUSE_TYPE_cascade_conv1x1_deconv_sum_conv1x1_2
 
 pixel_neighbour_type = pixel_link.PIXEL_NEIGHBOUR_TYPE_8
 #pixel_neighbour_type = pixel_link.PIXEL_NEIGHBOUR_TYPE_4

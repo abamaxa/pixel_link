@@ -48,7 +48,7 @@ tf.app.flags.DEFINE_integer('eval_image_height',  None, 'resized image height fo
 tf.app.flags.DEFINE_float('pixel_conf_threshold',  None, 'threshold on the pixel confidence')
 tf.app.flags.DEFINE_float('link_conf_threshold',  None, 'threshold on the link confidence')
 
-tf.app.flags.DEFINE_bool('using_moving_average', True, 
+tf.app.flags.DEFINE_bool('using_moving_average', False, 
                          'Whether to use ExponentionalMovingAverage')
                     
 tf.app.flags.DEFINE_float('moving_average_decay', 0.9999, 
@@ -195,7 +195,6 @@ def draw_bboxes(img, bboxes, color):
 def main(_):
     config_initialization()
     test()
-    
-    
+        
 if __name__ == '__main__':
     tf.app.run()

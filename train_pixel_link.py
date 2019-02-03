@@ -1,4 +1,9 @@
 #test code to make sure the ground truth calculation and data batch works well.
+import sys
+import os
+
+# add pylib/src to PYTHONPATH
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pylib', 'src'))
 
 import numpy as np
 import tensorflow as tf # test
@@ -30,6 +35,7 @@ tf.app.flags.DEFINE_integer('max_number_of_steps', 1000000, 'The maximum number 
 tf.app.flags.DEFINE_integer('log_every_n_steps', 1, 'log frequency')
 tf.app.flags.DEFINE_bool("ignore_missing_vars", False, '')
 tf.app.flags.DEFINE_string('checkpoint_exclude_scopes', None, 'checkpoint_exclude_scopes')
+tf.app.flags.DEFINE_integer('max_saved_checkpoints', 200, 'max number of saved checkpoints')
 
 # =========================================================================== #
 # Optimizer configs.
@@ -275,9 +281,13 @@ def train(train_op):
     elif FLAGS.gpu_memory_fraction > 0:
         sess_config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_memory_fraction
     
-    init_fn = util.tf.get_init_fn(checkpoint_path = FLAGS.checkpoint_path, train_dir = FLAGS.train_dir, 
-                          ignore_missing_vars = FLAGS.ignore_missing_vars, checkpoint_exclude_scopes = FLAGS.checkpoint_exclude_scopes)
-    saver = tf.train.Saver(max_to_keep = 200, write_version = 2)
+    init_fn = util.tf.get_init_fn(checkpoint_path = FLAGS.checkpoint_path, 
+                                  train_dir = FLAGS.train_dir, 
+                                  ignore_missing_vars = FLAGS.ignore_missing_vars, 
+                                  checkpoint_exclude_scopes = FLAGS.checkpoint_exclude_scopes)
+    
+    saver = tf.train.Saver(max_to_keep = FLAGS.max_saved_checkpoints, write_version = 2)
+    
     slim.learning.train(
             train_op,
             logdir = FLAGS.train_dir,
@@ -287,7 +297,7 @@ def train(train_op):
             log_every_n_steps = FLAGS.log_every_n_steps,
             save_summaries_secs = 30,
             saver = saver,
-            save_interval_secs = 1200,
+            save_interval_secs = 3600,
             session_config = sess_config
     )
 
@@ -300,7 +310,6 @@ def main(_):
     batch_queue = create_dataset_batch_queue(dataset)
     train_op = create_clones(batch_queue)
     train(train_op)
-    
-    
+        
 if __name__ == '__main__':
     tf.app.run()

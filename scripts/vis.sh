@@ -1,4 +1,5 @@
 # !/bin/bash
+export PYTHONPATH=pylib/src
 
 python visualize_detection_result.py \
 	--image=$1 \
